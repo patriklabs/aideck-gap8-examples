@@ -179,7 +179,7 @@ def main():
 
         if count % 10 == 0:
 
-            data = VelocitySetpoint(2, 3, 4, 5).encode()
+            data = VelocitySetpoint(0, 0, 0.5, 0).encode()
 
             cpxPacket = CPXPacket(
                 CPXFunction.CPX_F_CONTROL, CPXTarget.GAP8, CPXTarget.HOST, data

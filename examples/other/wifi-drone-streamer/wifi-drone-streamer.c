@@ -137,9 +137,14 @@ void rx_control_task(void *parameters)
 
     velocity_setpoint_t *velocity_data = (velocity_setpoint_t *)rxp_setpoint.data;
 
+    /*
     cpxPrintToConsole(LOG_TO_CRTP, "Received velocity setpoint: %d, %d, %d, %d\n",
                       velocity_data->vel_x, velocity_data->vel_y,
                       velocity_data->vel_z, velocity_data->yaw_rate);
+    */
+    cpxInitRoute(CPX_T_GAP8, CPX_T_STM32, CPX_F_APP, &rxp_setpoint.route);
+
+    cpxSendPacketBlockingThreadSafe(&rxp_setpoint);
   }
 }
 
