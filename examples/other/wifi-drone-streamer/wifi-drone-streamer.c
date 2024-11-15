@@ -46,6 +46,7 @@ static pi_buffer_t buffer;
 static EventGroupHandle_t evGroup;
 #define CAPTURE_DONE_BIT (1 << 0)
 
+static uint64_t img_timestamp = 0;
 // Performance menasuring variables
 static uint32_t start = 0;
 static uint32_t captureTime = 0;
@@ -155,6 +156,7 @@ typedef struct
   uint8_t depth;
   uint8_t type;
   uint32_t size;
+  uint64_t timestamp;
 } __attribute__((packed)) img_header_t;
 
 static jpeg_encoder_t jpeg_encoder;
@@ -176,7 +178,7 @@ static StreamerMode_t streamerMode = JPEG_ENCODING;
 
 static CPXPacket_t txp;
 
-void createImageHeaderPacket(CPXPacket_t *packet, uint32_t imgSize, StreamerMode_t imgType)
+void createImageHeaderPacket(CPXPacket_t *packet, uint32_t imgSize, StreamerMode_t imgType, uint64_t timestamp)
 {
   img_header_t *imgHeader = (img_header_t *)packet->data;
   imgHeader->magic = 0xBC;
@@ -185,6 +187,7 @@ void createImageHeaderPacket(CPXPacket_t *packet, uint32_t imgSize, StreamerMode
   imgHeader->depth = 1;
   imgHeader->type = imgType;
   imgHeader->size = imgSize;
+  imgHeader->timestamp = timestamp;
   packet->dataLength = sizeof(img_header_t);
 }
 
@@ -302,7 +305,7 @@ void camera_task(void *parameters)
   {
     if (wifiClientConnected == 1)
     {
-      start = xTaskGetTickCount();
+      img_timestamp = start = xTaskGetTickCount();
       pi_camera_capture_async(&camera, imgBuff, resolution, pi_task_callback(&task1, capture_done_cb, NULL));
       pi_camera_control(&camera, PI_CAMERA_CMD_START, 0);
       evBits = xEventGroupWaitBits(evGroup, CAPTURE_DONE_BIT, pdTRUE, pdFALSE, (TickType_t)(500 / portTICK_PERIOD_MS));
@@ -328,7 +331,7 @@ void camera_task(void *parameters)
         imgSize = headerSize + jpegSize + footerSize;
 
         // First send information about the image
-        createImageHeaderPacket(&txp, imgSize, JPEG_ENCODING);
+        createImageHeaderPacket(&txp, imgSize, JPEG_ENCODING, img_timestamp);
         cpxSendPacketBlockingThreadSafe(&txp);
 
         start = xTaskGetTickCount();
@@ -355,7 +358,7 @@ void camera_task(void *parameters)
         start = xTaskGetTickCount();
 
         // First send information about the image
-        createImageHeaderPacket(&txp, imgSize, RAW_ENCODING);
+        createImageHeaderPacket(&txp, imgSize, RAW_ENCODING, img_timestamp);
         cpxSendPacketBlockingThreadSafe(&txp);
 
         start = xTaskGetTickCount();
@@ -423,7 +426,7 @@ void createIMUPacket(CPXPacket_t *packet, imu_data_t *data)
   packet->dataLength = sizeof(imu_data_t);
 }
 
-static CPXPacket_t package;
+/*static CPXPacket_t package;
 void imu_transmit_task(void *parameters)
 {
   (void)parameters;
@@ -438,6 +441,30 @@ void imu_transmit_task(void *parameters)
 
     if (wifiClientConnected == 1)
     {
+      cpxSendPacketBlockingThreadSafe(&package);
+    }
+  }
+}*/
+
+static CPXPacket_t package;
+void imu_transmit_task(void *parameters)
+{
+  (void)parameters;
+  char *taskname = pcTaskGetName(NULL);
+
+  while (1)
+  {
+    cpxReceivePacketBlocking(CPX_F_MYAPP, &package);
+
+    // send value to host
+    cpxInitRoute(CPX_T_GAP8, CPX_T_WIFI_HOST, CPX_F_APP, &package.route);
+
+    imu_data_t *imu_data = (imu_data_t *)package.data;
+
+    if (wifiClientConnected == 1)
+    {
+      imu_data->timestamp = xTaskGetTickCount();
+
       cpxSendPacketBlockingThreadSafe(&package);
     }
   }

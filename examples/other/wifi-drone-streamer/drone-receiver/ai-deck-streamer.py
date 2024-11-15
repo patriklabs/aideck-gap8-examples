@@ -44,11 +44,11 @@ class ImageHeader:
 
     def decode(self, cpx_data):
 
-        if len(cpx_data.data) != 11:
+        if len(cpx_data.data) != 19:
             raise Exception("image header data too long!")
 
-        [magic, width, height, depth, format, size] = struct.unpack(
-            "<BHHBBI", cpx_data.data
+        [magic, width, height, depth, format, size, timestamp] = struct.unpack(
+            "<BHHBBIQ", cpx_data.data
         )
 
         if self.magic != magic:
@@ -59,10 +59,11 @@ class ImageHeader:
         self.depth = depth
         self.format = format
         self.size = size
+        self.timestamp = timestamp
 
     def print(self):
         print(
-            f"{self.magic}, {self.width}, {self.height}, {self.depth}, {self.format}, {self.size}"
+            f"{self.magic}, {self.width}, {self.height}, {self.depth}, {self.format}, {self.size}, {self.timestamp}"
         )
 
 
@@ -176,7 +177,6 @@ def main():
 
         cv2.waitKey(1)
 
-        """
         if count % 10 == 0:
 
             data = VelocitySetpoint(2, 3, 4, 5).encode()
@@ -188,7 +188,6 @@ def main():
             cpx.sendPacket(cpxPacket)
 
         count += 1
-        """
 
 
 if __name__ == "__main__":
