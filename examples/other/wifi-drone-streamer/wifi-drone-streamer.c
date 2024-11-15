@@ -43,7 +43,6 @@ static unsigned char *imgBuff;
 static struct pi_device camera;
 static pi_buffer_t buffer;
 
-SemaphoreHandle_t myXSemaphore = NULL;
 static EventGroupHandle_t evGroup;
 #define CAPTURE_DONE_BIT (1 << 0)
 
@@ -176,15 +175,6 @@ uint32_t jpegSize;
 static StreamerMode_t streamerMode = JPEG_ENCODING;
 
 static CPXPacket_t txp;
-
-void cpxSendPacketBlockingThreadSafe(const CPXPacket_t *packet)
-{
-  if (xSemaphoreTake(myXSemaphore, (TickType_t)portMAX_DELAY) == pdTRUE)
-  {
-    cpxSendPacketBlocking(packet);
-    xSemaphoreGive(myXSemaphore);
-  }
-}
 
 void createImageHeaderPacket(CPXPacket_t *packet, uint32_t imgSize, StreamerMode_t imgType)
 {
@@ -474,8 +464,6 @@ void start_example(void)
 
   cpxPrintToConsole(LOG_TO_CRTP, "-- WiFi image streamer example --\n");
 
-  myXSemaphore = xSemaphoreCreateBinary();
-  xSemaphoreGive(myXSemaphore);
   evGroup = xEventGroupCreate();
 
   BaseType_t xTask;
