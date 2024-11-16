@@ -72,10 +72,10 @@ class VelocitySetpoint:
     def __init__(self, vel_x=0, vel_y=0, vel_z=0, yaw_rate=0) -> None:
 
         self.magic = 0xAA
-        self.vel_x = vel_x * 1000  # short
-        self.vel_y = vel_y * 1000  # short
-        self.vel_z = vel_z * 1000  # short
-        self.yaw_rate = yaw_rate * 500  # short
+        self.vel_x = int(vel_x * 1000)  # short
+        self.vel_y = int(vel_y * 1000)  # short
+        self.vel_z = int(vel_z * 1000)  # short
+        self.yaw_rate = int(yaw_rate * 500)  # short
 
     def encode(self):
         return struct.pack(
@@ -177,9 +177,9 @@ def main():
 
         cv2.waitKey(1)
 
-        if count % 10 == 0:
+        if count % 2000 == 0 and count > 0:
 
-            data = VelocitySetpoint(0, 0, 0.5, 0).encode()
+            data = VelocitySetpoint(0, 0, 0.3, 0).encode()
 
             cpxPacket = CPXPacket(
                 CPXFunction.CPX_F_CONTROL, CPXTarget.GAP8, CPXTarget.HOST, data
