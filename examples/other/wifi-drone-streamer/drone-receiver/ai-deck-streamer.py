@@ -8,6 +8,15 @@ from cflib.cpx.transports import SocketTransport
 import struct
 import numpy as np
 import cv2
+from enum import Enum
+import time
+import os
+
+import datetime
+
+
+class MyCPXFunction(Enum):
+    CPX_F_CONTROL = 7
 
 
 class IMU:
@@ -36,6 +45,12 @@ class IMU:
         print(
             f"{self.magic}, {self.gyro_x:.3f}, {self.gyro_y:.3f}, {self.gyro_z:.3f}, {self.acc_x:.3f}, {self.acc_y:.3f}, {self.acc_z:.3f}, {self.timestamp}"
         )
+
+    def write(self, path):
+        with open(path, "a") as f:
+            f.write(
+                f"{self.magic}, {self.gyro_x:.3f}, {self.gyro_y:.3f}, {self.gyro_z:.3f}, {self.acc_x:.3f}, {self.acc_y:.3f}, {self.acc_z:.3f}, {self.timestamp}\n"
+            )
 
 
 class ImageHeader:
@@ -130,6 +145,10 @@ class ImageData:
             return decoded
 
 
+def save_image(path, image, timestamp):
+    cv2.imwrite(os.path.join(path, f"image_{timestamp}.png"), image)
+
+
 def main():
     # Your code here
     cpx = CPX(SocketTransport("192.168.4.1", 5000))
@@ -139,6 +158,13 @@ def main():
     image_data = None
 
     count = 0
+
+    date = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    output_path = os.path.join("output", date)
+
+    os.makedirs(os.path.join(output_path, "images"), exist_ok=True)
+
+    last_command_time = time.time()
 
     while True:
 
@@ -153,6 +179,7 @@ def main():
 
             imu.decode(cpx_data)
             imu.print()
+            imu.write(os.path.join(output_path, "imu.txt"))
 
         elif magic == ImageHeader.magic:
 
@@ -171,23 +198,31 @@ def main():
 
             if image_data.complete():
                 image = image_data.get_image()
+                count += 1
                 cv2.imshow("Image", image)
+
+                save_image(
+                    os.path.join(output_path, "images"),
+                    image,
+                    image_data.image_header.timestamp,
+                )
 
                 image_data = None
 
-        cv2.waitKey(1)
+                # Send a new command every 500ms
+                current_time = time.time()
+                if current_time - last_command_time >= 0.5:
+                    data = VelocitySetpoint(0, 0, 0.3, 0).encode()
+                    cpxPacket = CPXPacket(
+                        MyCPXFunction.CPX_F_CONTROL,
+                        CPXTarget.GAP8,
+                        CPXTarget.HOST,
+                        data,
+                    )
+                    cpx.sendPacket(cpxPacket)
+                    last_command_time = current_time
 
-        if count % 2000 == 0 and count > 0:
-
-            data = VelocitySetpoint(0, 0, 0.3, 0).encode()
-
-            cpxPacket = CPXPacket(
-                CPXFunction.CPX_F_CONTROL, CPXTarget.GAP8, CPXTarget.HOST, data
-            )
-
-            cpx.sendPacket(cpxPacket)
-
-        count += 1
+                cv2.waitKey(1)
 
 
 if __name__ == "__main__":
